@@ -1,0 +1,70 @@
+version: '3.7'
+services:
+
+  fluent-bit:
+    image: fluent/fluent-bit:1.6-debug
+    container_name: flb01
+    volumes:
+      - ./conf:/fluent-bit/etc
+    links:
+      - "elasticsearch"
+    ports:
+      - 24224:24224
+      - 5140:5140/udp
+      - 2020:2020
+    logging:
+        driver: "json-file"
+        options:
+            max-size: 100m
+            max-file: "5"
+    networks:
+      - elastic
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.8.1
+    container_name: es01
+    volumes:
+      - type: bind
+        source: ./es
+        target: /usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - elastic
+    environment:
+      - node.name=es01
+      - cluster.name=es-docker-cluster
+      - bootstrap.memory_lock=false
+      - cluster.initial_master_nodes=es01
+      - "ES_JAVA_OPTS=-Xms1024m -Xmx1024m"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.8.1
+    container_name: kib01
+    links:
+      - "elasticsearch"
+    ports:
+      - 5601:5601
+    environment:
+      ELASTICSEARCH_URL: http://es01:9200
+      ELASTICSEARCH_HOSTS: http://es01:9200
+    networks:
+      - elastic
+
+  ubuntu:
+    image: ubuntu
+    command: [/bin/echo, "Dotnet Plus!"]
+    depends_on:
+      - fluent-bit
+    networks:
+      - elastic
+    logging:
+      driver: fluentd
+      options:
+  #      fluentd-address: localhost:24224
+         tag: docker-ubuntu
+  
+networks:
+  elastic:
+    driver: bridge
+
